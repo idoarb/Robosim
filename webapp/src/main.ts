@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 // @ts-ignore
 import loadMujoco from 'mujoco-js';
+import { neon } from '@neondatabase/serverless';
+
 // Connection URL and Password fetched dynamically securely
-const NEON_URL = "/api/neon";
 const NEON_CONN = "postgresql://neondb_owner:npg_jsaCe7Qq1oBl@ep-muddy-fire-ads9qx8f.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require";
+const sqlClient = neon(NEON_CONN);
 const SESSION_ID = "web_" + Math.random().toString(36).substring(2, 6) + "_" + Date.now().toString(36).substring(6);
 
 // --- State ---
@@ -217,16 +219,7 @@ async function initSession() {
 
     try {
         for (const query of queries) {
-            const response = await fetch(NEON_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'neon-connection-string': NEON_CONN },
-                body: JSON.stringify({ query })
-            });
-
-            if (!response.ok) {
-                console.error("Neon init err text:", await response.text());
-                throw new Error("Init query failed");
-            }
+            await sqlClient.query(query, [], {});
         }
         dbReady = true;
         document.getElementById('status-dot')?.classList.add('online');
@@ -340,19 +333,13 @@ function loop() {
             if (frameBuffer.length >= 60) {
                 const values = frameBuffer.splice(0, frameBuffer.length).join(', ');
                 const sql = `INSERT INTO robot_frames (session_id, frame_index, timestamp_ns, joint_pos, joint_vel, torques, ee_pos, contact_force, input_vec, grip) VALUES ${values};`;
-
-                fetch(NEON_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'neon-connection-string': NEON_CONN },
-                    body: JSON.stringify({ query: sql })
-                }).then(async (response) => {
-                    if (!response.ok) console.error("Telemetry Error:", await response.text());
-                    else {
-                        framesSent += 60;
-                        const el = document.getElementById('db-rows');
-                        if (el) el.innerText = `${framesSent} rows recorded`;
-                    }
-                }).catch(() => { });
+                sqlClient.query(sql, [], {}).then(() => {
+                    framesSent += 60;
+                    const el = document.getElementById('db-rows');
+                    if (el) el.innerText = `${framesSent} rows recorded`;
+                }).catch((e: any) => {
+                    console.error("Telemetry Error:", e.message);
+                });
             }
         } catch (e) {
             console.warn("Logging failed", e);

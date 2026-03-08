@@ -8,7 +8,7 @@
         "build": "vite build",
         "preview": "vite preview",
         "predeploy": "node \"C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js\" run build",
-        "deploy": "gh-pages -d dist"
+        "deploy": "node ./node_modules/gh-pages/bin/gh-pages.js -d dist"
     },
     "devDependencies": {
         "@types/three": "^0.183.1",
